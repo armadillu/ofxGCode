@@ -32,7 +32,9 @@ public:
     
     int circle_resolution;      //equivalent to the value set by ofSetCircleResolution()
     
-    int pen_down_value;         //height value used when dropping the pen
+    float pen_down_value = 37.;  //z value in mm that makes the pen touch the bed in mm
+	float liftPenMm = 1.5; 			//in mm, when we lift pen, how many mm do we do that
+
     //NOTE: the axidraw python script I use currently ignores this value
     
     vector<ofVec2f> shape_pnts; //used for begin_shape / end_shape
@@ -40,6 +42,7 @@ public:
     vector<GLine> lines;        //the collection of lines that make up this drawing
     
     Clipping clip;              //clipping mask to make sure we don't have lines out of bounds
+	ofRectangle usableCanvas;
     
     //showing info
     bool show_transit_lines;        //if true, the movement of the plotter head while the pen is up will be drawn
@@ -49,8 +52,7 @@ public:
     ofColor demo_col;           //the color used for drawing this g-code. Set this to whatever you want
     float demo_fade_prc;        //how faded the color will be. Typically overlapping pen strokes will appear darker so it is helpful have this be true in our display as well
     
-    
-    
+
     
     //----------------
     // Functions
@@ -59,10 +61,10 @@ public:
     //--- Setup
     
     ///setup must be called before you can use a ofxGCode object. pixels_per_inch argument is optional and will default to 100 pixels per inch
-    void setup(float _pixels_per_inch = 100);
+    void setup(ofRectangle usableCanvas); //ofRectangle(60, 40, 230 - 60, 235 - 40); seems to work for me
     
     ///changes the canvas size. By default this is set to ofGetWidth() & ofGetHeight() in setup
-    void set_size(int w, int h);
+    //void set_size(int w, int h);
     
     ///clears all lines from this drawing
     void clear();
@@ -268,7 +270,11 @@ public:
     static bool checkInPolygon(vector<ofVec2f> p, float x, float y);
     
     
-    
+
+protected:
+
+	float flipX(float &p) const;
+	float flipY(float &p) const;
     
     
     

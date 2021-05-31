@@ -6,16 +6,17 @@
 
 #include "ofxGCode.hpp"
 
-void ofxGCode::setup(float _pixels_per_inch){
+void ofxGCode::setup(ofRectangle usableCanvas){
     //set some defaults
     circle_resolution = 50;
-    pen_down_value = 60;
-    
+
     //inches for axidraw
-    pixels_per_inch = _pixels_per_inch;
-    
-    set_size(ofGetWidth(), ofGetHeight());
-    
+    pixels_per_inch = 1;
+
+    //set_size(ofGetWidth(), ofGetHeight());
+	clip.setup(usableCanvas.getTopLeft(), usableCanvas.getBottomRight());
+	this->usableCanvas = usableCanvas;
+
     //display stuff
     show_transit_lines = false;
     show_path_with_color = false;
@@ -24,25 +25,38 @@ void ofxGCode::setup(float _pixels_per_inch){
     demo_fade_prc = 0.75;
 }
 
-void ofxGCode::set_size(int w, int h){
-    clip.setup(ofVec2f(0, 0), ofVec2f(w,h));
-    
-    clear();
-}
+//void ofxGCode::set_size(int w, int h){
+//    clip.setup(ofVec2f(0, 0), ofVec2f(w,h));
+//    
+//    clear();
+//}
 
 void ofxGCode::clear(){
     lines.clear();
 }
 
 void ofxGCode::draw(int max_lines_to_show){
-    
+
+	float sx = ofGetWidth() / usableCanvas.getRight();
+	float sy = ofGetHeight() / usableCanvas.getBottom();
+	float scale = std::min(sx, sy) - 0.05;
+	ofPushMatrix();
+	ofScale(scale, scale);
+
+	//draw canvas
+	ofSetColor(255,32);
+	ofNoFill();
+	ofFill();
+	ofDrawRectangle(usableCanvas);
+	ofSetColor(255);
+
     int draw_count = 0;
     if (max_lines_to_show <= 0) max_lines_to_show = lines.size();
-    
+
     int end_index = MIN(max_lines_to_show, lines.size());
     for (int i=0; i<end_index; i++){
         //the line
-        GLine line = lines[i];
+        GLine & line = lines[i];
         
         ofSetColor(demo_col.r, demo_col.g, demo_col.b, 255 * demo_fade_prc);
         
@@ -83,7 +97,16 @@ void ofxGCode::draw(int max_lines_to_show){
 //            }
         }
     }
-    
+
+	ofPopMatrix();
+}
+
+float ofxGCode::flipX(float &x) const{
+	return ofMap(x, usableCanvas.getLeft(), usableCanvas.getRight(), usableCanvas.getRight(), usableCanvas.getLeft(), true);
+}
+
+float ofxGCode::flipY(float &y) const{
+	return ofMap(y, usableCanvas.getTop(), usableCanvas.getBottom(), usableCanvas.getBottom(), usableCanvas.getTop(), true);
 }
 
 //genertaes gcode and writes it to a file
@@ -94,36 +117,48 @@ void ofxGCode::save(string name){
     commands.clear();
     
     //pen up and positioned at the origin
-    commands.push_back("M3 S0");
-    commands.push_back("G0 X0 Y0");
+    //commands.push_back("M3 S0");
+    //commands.push_back("G0 X0 Y0");
+
+	commands.push_back("G28"); //autohome
+	commands.push_back("G0 X0 Y0 Z" + ofToString(pen_down_value + liftPenMm) ); //lift pen
+	//move to our "origin" (clip box)
+	commands.push_back("G0 X" + ofToString(clip.min.x,2) + " Y"  + ofToString(clip.min.y,2) + " Z" + ofToString(pen_down_value + liftPenMm) );
     
-    ofVec2f last_pos = ofVec2f(0,0);
+    ofVec2f last_pos = clip.min;
     
     for(int i=0; i<lines.size(); i++){
-        GLine line = lines[i];
-        ofVec2f pos_a = ofVec2f(line.a.x * inches_per_pixel, line.a.y * inches_per_pixel);
-        ofVec2f pos_b = ofVec2f(line.b.x * inches_per_pixel, line.b.y * inches_per_pixel);
+        GLine & line = lines[i];
+        ofVec2f pos_a = ofVec2f((line.a.x) * inches_per_pixel, flipY(line.a.y) * inches_per_pixel);
+        ofVec2f pos_b = ofVec2f((line.b.x) * inches_per_pixel, flipY(line.b.y) * inches_per_pixel);
         
         //if we are not at the start point, pen up and move there and pen down
         if ( pos_a != last_pos){
-            commands.push_back("M3 S0");
-            commands.push_back("G0 X"+ofToString(pos_a.x)+" Y"+ofToString(pos_a.y));
-            commands.push_back("M3 S"+ofToString(pen_down_value));
+
+			//pen UP in the last pos we moved to
+			commands.push_back("G0 X" + ofToString(last_pos.x,2) + " Y"  + ofToString(last_pos.y,2) + " Z" + ofToString(pen_down_value + liftPenMm));
+
+			//move to the new pos
+            commands.push_back("G0 X"+ofToString(pos_a.x,2)+" Y"+ofToString(pos_a.y,2) + " Z" + ofToString(pen_down_value + liftPenMm));
+
+			//pen DOWN
+			commands.push_back("G0 X"+ofToString(pos_a.x,2)+" Y"+ofToString(pos_a.y,2) + " Z" + ofToString(pen_down_value));
+
         }
         else{
             //cout<<"do not life pen at "<<line.a<<endl;
         }
         
         //move to the end point
-        commands.push_back("G1 X"+ofToString(pos_b.x)+" Y"+ofToString(pos_b.y));
+        commands.push_back("G1 X" + ofToString(pos_b.x) + " Y" + ofToString(pos_b.y)  + " Z" + ofToString(pen_down_value));
         
         //store it
         last_pos = ofVec2f (pos_b);
     }
     
     //add some closing steps
-    commands.push_back("M3 S0");
-    commands.push_back("G0 X0 Y0");
+	commands.push_back("G0 X" + ofToString(last_pos.x,2) + " Y"  + ofToString(last_pos.y,2) + " Z" + ofToString(pen_down_value + liftPenMm) );
+	commands.push_back("G0 X0 Y225 Z" + ofToString(pen_down_value + liftPenMm) );
     
     cout<<"transit distance: "<<measureTransitDistance()<<endl;
     
@@ -307,8 +342,8 @@ void ofxGCode::line(ofVec2f a, ofVec2f b){
 }
 
 void ofxGCode::line(float x1, float y1, float x2, float y2){
-    ofVec2f p1 = getModelPoint(x1,y1);
-    ofVec2f p2 = getModelPoint(x2,y2);
+	ofVec2f p1 = getModelPoint(x1,y1);
+	ofVec2f p2 = getModelPoint(x2,y2);
     
     //clip the points to fit our canvas, rejecting the line if it would be entirely out of bounds
     if (!clip.clip(p1, p2)) {
@@ -416,7 +451,7 @@ vector<ofVec2f> ofxGCode::get_bezier_pnts(ofVec2f p1, ofVec2f c1, ofVec2f c2, of
 
 //be aware that this tool may no longer work
 void ofxGCode::dot(float x, float y){
-    line(x,y,x,y);
+    line(x,y,x+0.01,y+0.01);
 }
 
 
@@ -454,6 +489,7 @@ void ofxGCode::text(string text, ofTrueTypeFont * font, float x, float y){
 ofVec2f ofxGCode::getModelPoint(ofVec3f pnt){
     return getModelPoint(pnt.x, pnt.y);
 }
+
 ofVec2f ofxGCode::getModelPoint(float x, float y){
     //get the model of th current matrix
     GLfloat m[16];
@@ -465,7 +501,7 @@ ofVec2f ofxGCode::getModelPoint(float x, float y){
     baseline[0] = ofVec4f(1,0,0,0);
     baseline[1] = ofVec4f(0,1,0,0);
     baseline[2] = ofVec4f(0,0,1,0);
-    baseline[3] = ofVec4f(-ofGetWidth()/2,-ofGetHeight()/2,-1,1);   //the z value is the wildcard. I'm not sure how it is set
+    baseline[3] = ofVec4f(-usableCanvas.width/2,-usableCanvas.height/2,1,1);   //the z value is the wildcard. I'm not sure how it is set
     
     bool matches = true;
     for (int i=0; i<4; i++){

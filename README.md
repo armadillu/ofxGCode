@@ -1,4 +1,9 @@
 # ofxGCode
+
+#### THIS FORK
+
+The goal is to use a Creality Ender3 as a pen plotter. The Gcode that works for an AxiDraw doesnt seem to do for an Creality Ender3, so here we are, writing ugly code....
+
 #### version 1.0
 
 ![ofxGCode drawings](https://github.com/andymasteroffish/ofxGCode/blob/master/topper.jpg)
