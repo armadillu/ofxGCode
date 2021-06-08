@@ -490,65 +490,18 @@ ofVec2f ofxGCode::getModelPoint(ofVec3f pnt){
     return getModelPoint(pnt.x, pnt.y);
 }
 
+
 ofVec2f ofxGCode::getModelPoint(float x, float y){
-    //get the model of th current matrix
-    GLfloat m[16];
-    glGetFloatv(GL_MODELVIEW_MATRIX, m);
-    ofMatrix4x4 mat(m);
-    
-    //check if this model matches the baseline, no matrix model and avoid a lot of unecessary work if it does
-    ofVec4f baseline[4];
-    baseline[0] = ofVec4f(1,0,0,0);
-    baseline[1] = ofVec4f(0,1,0,0);
-    baseline[2] = ofVec4f(0,0,1,0);
-    baseline[3] = ofVec4f(-usableCanvas.width/2,-usableCanvas.height/2,1,1);   //the z value is the wildcard. I'm not sure how it is set
-    
-    bool matches = true;
-    for (int i=0; i<4; i++){
-        if (mat._mat[i].x != baseline[i].x) matches = false;
-        if (mat._mat[i].y != baseline[i].y) matches = false;
-        if (mat._mat[i].z != baseline[i].z && i!=3) matches = false;
-        if (mat._mat[i].w != baseline[i].w) matches = false;
-    }
-    
-    //if it all matches the baseline, we're not in a matrix and can just return the input values
-    if (matches){
-        //cout<<"nothing doing"<<endl;
-        return ofVec2f(x,y);
-    }
-    
-    //get the model of the default screen (this can't be used as the baseline above for reasons I don't totally understand)
-    ofMatrix4x4 ident = ofMatrix4x4::newIdentityMatrix();
-    
-    //extract info from that
-    ofVec3f trans_val = mat.getTranslation();
-    ofVec3f scale_val = mat.getScale();
-    ofQuaternion quat = mat.getRotate();
-    ofVec3f rot_val = quat.asVec3();
-    ofVec3f euler = quat.getEuler();
-    
-    
-    ofPoint origPoint = ofPoint(x,y);
-    ofVec2f scaled_point;
-    scaled_point.x = origPoint.x * scale_val.x;
-    scaled_point.y = origPoint.y * scale_val.y;
-    
-    float euler_deg = euler.z;
-    if (euler.x != 0){  //the euler degreees start counting back from 90 and the x and y values of rot_val go to 180
-        euler_deg = 90 + (90-euler_deg);
-    }
-    float mat_angle = ofDegToRad (euler_deg);
-    float base_angle = atan2(scaled_point.x, scaled_point.y);   //shouldn't this be y then x??? Not sure why this works
-    float angle = base_angle - mat_angle;
-    
-    float dist = scaled_point.length();
-    
-    ofVec2f return_val;
-    return_val.x = sin(angle) * dist +  (ofGetWidth()/2 + trans_val.x);
-    return_val.y = cos(angle) * dist + (ofGetHeight()/2 + trans_val.y);
-    
-    return return_val;
+
+	ofMatrix4x4 ofMatrix = ofGetCurrentMatrix(OF_MATRIX_MODELVIEW);
+	ofMatrix = ofMatrix.getTransposedOf(ofMatrix);
+
+	ofVec4f pt = ofVec4f(x,y,0,1);
+	ofVec4f pt2 = ofMatrix * pt + ofVec4f(ofGetViewportWidth()/2, ofGetViewportHeight()/2, 0, 0);
+
+	return ofVec2f(pt2.x, pt2.y);
 }
+
 
 //this is not perfect yet. Some of the resulting order is definitely not as efficient as it could be
 void ofxGCode::sort(){

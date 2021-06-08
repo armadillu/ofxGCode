@@ -33,7 +33,7 @@ public:
     int circle_resolution;      //equivalent to the value set by ofSetCircleResolution()
     
     float pen_down_value = 37.;  //z value in mm that makes the pen touch the bed in mm
-	float liftPenMm = 1.5; 			//in mm, when we lift pen, how many mm do we do that
+	float liftPenMm = 4; 			//in mm, when we lift pen, how many mm do we do that
 
     //NOTE: the axidraw python script I use currently ignores this value
     
