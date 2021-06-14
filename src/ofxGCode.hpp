@@ -35,6 +35,8 @@ public:
     float pen_down_value = 37.;  //z value in mm that makes the pen touch the bed in mm
 	float liftPenMm = 4; 			//in mm, when we lift pen, how many mm do we do that
 
+	int moveSpeed = 0; //for each G0 command, the Fsupplied speed. if set to 0, no F will be specified
+
     //NOTE: the axidraw python script I use currently ignores this value
     
     vector<ofVec2f> shape_pnts; //used for begin_shape / end_shape

@@ -44,7 +44,7 @@ void ofxGCode::draw(int max_lines_to_show){
 	ofScale(scale, scale);
 
 	//draw canvas
-	ofSetColor(255,32);
+	ofSetColor(255,255,0, 5);
 	ofNoFill();
 	ofFill();
 	ofDrawRectangle(usableCanvas);
@@ -53,50 +53,63 @@ void ofxGCode::draw(int max_lines_to_show){
     int draw_count = 0;
     if (max_lines_to_show <= 0) max_lines_to_show = lines.size();
 
+	ofVboMesh linesMesh;
+	ofVboMesh movesMesh;
+	linesMesh.setMode(OF_PRIMITIVE_LINES);
+	movesMesh.setMode(OF_PRIMITIVE_LINES);
+
     int end_index = MIN(max_lines_to_show, lines.size());
     for (int i=0; i<end_index; i++){
         //the line
         GLine & line = lines[i];
         
-        ofSetColor(demo_col.r, demo_col.g, demo_col.b, 255 * demo_fade_prc);
+        //ofSetColor(demo_col.r, demo_col.g, demo_col.b, 255 * demo_fade_prc);
         
         //fading between colors to show order
-        if (show_path_with_color){
-            float prc = (float)i/(float)lines.size();
-            ofSetColor(0, 255.0*(1.0-prc), 255*prc);
-        }
+//        if (show_path_with_color){
+//            float prc = (float)i/(float)lines.size();
+//            ofSetColor(0, 255.0*(1.0-prc), 255*prc);
+//        }
         
-        if (show_do_not_reverse && line.do_not_reverse){
-            ofSetColor(255, 38, 226);
-            //throw wings on it
-            float prc = 0.9;
-            ofVec2f wing_pnt;
-            wing_pnt.x = (1.0-prc)*line.a.x + prc*line.b.x;
-            wing_pnt.y = (1.0-prc)*line.a.y + prc*line.b.y;
-            //ofDrawCircle(wing_pnt.x, wing_pnt.y, 2);
-            float angle = atan2(line.a.y-line.b.y, line.a.x-line.b.x);
-            float dist = 7;
-            float spread = PI/8;
-            ofDrawLine(wing_pnt.x, wing_pnt.y, wing_pnt.x+cos(angle+spread)*dist, wing_pnt.y+sin(angle+spread)*dist);
-            ofDrawLine(wing_pnt.x, wing_pnt.y, wing_pnt.x+cos(angle-spread)*dist, wing_pnt.y+sin(angle-spread)*dist);
-        }
+//        if (show_do_not_reverse && line.do_not_reverse){
+//            ofSetColor(255, 38, 226);
+//            //throw wings on it
+//            float prc = 0.9;
+//            ofVec2f wing_pnt;
+//            wing_pnt.x = (1.0-prc)*line.a.x + prc*line.b.x;
+//            wing_pnt.y = (1.0-prc)*line.a.y + prc*line.b.y;
+//            //ofDrawCircle(wing_pnt.x, wing_pnt.y, 2);
+//            float angle = atan2(line.a.y-line.b.y, line.a.x-line.b.x);
+//            float dist = 7;
+//            float spread = PI/8;
+//            ofDrawLine(wing_pnt.x, wing_pnt.y, wing_pnt.x+cos(angle+spread)*dist, wing_pnt.y+sin(angle+spread)*dist);
+//            ofDrawLine(wing_pnt.x, wing_pnt.y, wing_pnt.x+cos(angle-spread)*dist, wing_pnt.y+sin(angle-spread)*dist);
+//        }
         
-        line.draw();
-    
+        //line.draw();
+		linesMesh.addVertex(glm::vec3(line.a.x,line.a.y, 0));
+		linesMesh.addVertex(glm::vec3(line.b.x,line.b.y, 0));
+
         
         //the transit to the next line
-        if (i < end_index-1 && show_transit_lines){
-            ofVec2f transit_start = line.b;
-            ofVec2f transit_end = lines[i+1].a;
+        if (show_transit_lines && i < end_index-1){
+            ofVec2f & transit_start = line.b;
+            ofVec2f & transit_end = lines[i+1].a;
             if (transit_start != transit_end){
-                ofSetColor(255, 0,0, 60);
-                ofDrawLine(transit_start, transit_end);
+                //ofSetColor(255, 0,0, 60);
+                //ofDrawLine(transit_start, transit_end);
+				movesMesh.addVertex(glm::vec3(transit_start.x,transit_start.y, 0));
+				movesMesh.addVertex(glm::vec3(transit_end.x,transit_end.y, 0));
             }
-//            else{
-//                cout<<"skip transit at "<<transit_start<<endl;
-//            }
         }
     }
+
+	ofSetColor(0,0,0,255);
+	linesMesh.draw();
+
+	ofSetColor(255,0,0,40);
+	movesMesh.draw();
+	ofSetColor(255);
 
 	ofPopMatrix();
 }
@@ -126,7 +139,12 @@ void ofxGCode::save(string name){
 	commands.push_back("G0 X" + ofToString(clip.min.x,2) + " Y"  + ofToString(clip.min.y,2) + " Z" + ofToString(pen_down_value + liftPenMm) );
     
     ofVec2f last_pos = clip.min;
-    
+
+	string extraSpeedCommand;
+	if(moveSpeed > 0){
+		extraSpeedCommand = " F" + ofToString(moveSpeed);
+	}
+
     for(int i=0; i<lines.size(); i++){
         GLine & line = lines[i];
         ofVec2f pos_a = ofVec2f((line.a.x) * inches_per_pixel, flipY(line.a.y) * inches_per_pixel);
@@ -136,13 +154,13 @@ void ofxGCode::save(string name){
         if ( pos_a != last_pos){
 
 			//pen UP in the last pos we moved to
-			commands.push_back("G0 X" + ofToString(last_pos.x,2) + " Y"  + ofToString(last_pos.y,2) + " Z" + ofToString(pen_down_value + liftPenMm));
+			commands.push_back("G0 X" + ofToString(last_pos.x,2) + " Y"  + ofToString(last_pos.y,2) + " Z" + ofToString(pen_down_value + liftPenMm) + extraSpeedCommand);
 
 			//move to the new pos
-            commands.push_back("G0 X"+ofToString(pos_a.x,2)+" Y"+ofToString(pos_a.y,2) + " Z" + ofToString(pen_down_value + liftPenMm));
+            commands.push_back("G0 X"+ofToString(pos_a.x,2)+" Y"+ofToString(pos_a.y,2) + " Z" + ofToString(pen_down_value + liftPenMm) + extraSpeedCommand);
 
 			//pen DOWN
-			commands.push_back("G0 X"+ofToString(pos_a.x,2)+" Y"+ofToString(pos_a.y,2) + " Z" + ofToString(pen_down_value));
+			commands.push_back("G0 X"+ofToString(pos_a.x,2)+" Y"+ofToString(pos_a.y,2) + " Z" + ofToString(pen_down_value) + extraSpeedCommand);
 
         }
         else{
