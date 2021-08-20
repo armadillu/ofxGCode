@@ -114,7 +114,14 @@ public:
     void circle(float x, float y, float size);
     ///static function to get the points that make up a circle. steps will be the resolution of the circle
     static vector<ofVec2f> get_circle_pnts(ofVec2f center, float size, int steps);
-    
+
+	//--- spiral
+	void spiral(float x, float y, float size, float turnsDensity);
+
+	//--- fill circle with lines
+	void circleFill(float x, float y, float size, float turnsDensity);
+
+
     
     //--- Polygons
     

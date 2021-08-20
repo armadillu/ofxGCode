@@ -149,47 +149,46 @@ void ofxGCode::save(string name){
         GLine & line = lines[i];
         ofVec2f pos_a = ofVec2f((line.a.x) * inches_per_pixel, flipY(line.a.y) * inches_per_pixel);
         ofVec2f pos_b = ofVec2f((line.b.x) * inches_per_pixel, flipY(line.b.y) * inches_per_pixel);
-        
+
+		float dist = pos_a.distance(last_pos);
         //if we are not at the start point, pen up and move there and pen down
-        if ( pos_a != last_pos){
+        if ( dist > 0.01){ //next line is not a continuous one, lift pen, move to the next line
 
 			//pen UP in the last pos we moved to
 			commands.push_back("G0 X" + ofToString(last_pos.x,2) + " Y"  + ofToString(last_pos.y,2) + " Z" + ofToString(pen_down_value + liftPenMm) + extraSpeedCommand);
 
 			//move to the new pos
-            commands.push_back("G0 X"+ofToString(pos_a.x,2)+" Y"+ofToString(pos_a.y,2) + " Z" + ofToString(pen_down_value + liftPenMm) + extraSpeedCommand);
+            commands.push_back("G0 X"+ofToString(pos_a.x,2) + " Y" + ofToString(pos_a.y,2) + " Z" + ofToString(pen_down_value + liftPenMm) + extraSpeedCommand);
 
 			//pen DOWN
-			commands.push_back("G0 X"+ofToString(pos_a.x,2)+" Y"+ofToString(pos_a.y,2) + " Z" + ofToString(pen_down_value) + extraSpeedCommand);
+			commands.push_back("G0 X"+ofToString(pos_a.x,2) + " Y" + ofToString(pos_a.y,2) + " Z" + ofToString(pen_down_value) + extraSpeedCommand);
 
-        }
-        else{
+        }else{
             //cout<<"do not life pen at "<<line.a<<endl;
         }
         
         //move to the end point
-        commands.push_back("G1 X" + ofToString(pos_b.x) + " Y" + ofToString(pos_b.y)  + " Z" + ofToString(pen_down_value));
+        commands.push_back("G1 X" + ofToString(pos_b.x) + " Y" + ofToString(pos_b.y)  + " Z" + ofToString(pen_down_value) + extraSpeedCommand);
         
         //store it
-        last_pos = ofVec2f (pos_b);
+        last_pos = pos_b;
     }
     
     //add some closing steps
-	commands.push_back("G0 X" + ofToString(last_pos.x,2) + " Y"  + ofToString(last_pos.y,2) + " Z" + ofToString(pen_down_value + liftPenMm) );
-	commands.push_back("G0 X0 Y225 Z" + ofToString(pen_down_value + liftPenMm) );
+	commands.push_back("G0 X" + ofToString(last_pos.x,2) + " Y"  + ofToString(last_pos.y,2) + " Z" + ofToString(pen_down_value + liftPenMm) + extraSpeedCommand );
+	commands.push_back("G0 X0 Y225 Z" + ofToString(pen_down_value + liftPenMm) + extraSpeedCommand);
     
-    cout<<"transit distance: "<<measureTransitDistance()<<endl;
+	ofLogNotice() << "transit distance: " << measureTransitDistance();
     
     //write it to file
-    
-    cout<<"saving "<<commands.size()<<" commands"<<endl;
+	ofLogNotice() << "saving " << commands.size() << " commands";
     ofFile myTextFile;
     myTextFile.open(name,ofFile::WriteOnly);
     for (int i=0; i<commands.size(); i++){
         myTextFile<<commands[i]<<endl;
     }
     
-    cout<<"SAVED"<<endl;
+    ofLogNotice() << "SAVED";
 }
 
 
@@ -316,6 +315,44 @@ vector<ofVec2f> ofxGCode::get_circle_pnts(ofVec2f center, float size, int steps)
         pnts.push_back(pos);
     }
     return pnts;
+}
+
+void ofxGCode::spiral(float x, float y, float size, float turnsDensity){
+	float angle_step =(TWO_PI/(float)circle_resolution);
+	begin_shape();
+
+	//float area = M_PI * size * size;
+	size_t n = circle_resolution * size * turnsDensity;
+	for (size_t i=0; i < n; i++){
+		ofVec2f pnt;
+		float angle = angle_step  * i;
+		float pct = (i) / double(n - 1);
+		pnt.x = x + sin(angle) * size * pct;
+		pnt.y = y + cos(angle) * size * pct;
+		vertex(pnt.x, pnt.y);
+	}
+	end_shape(false);
+}
+
+void ofxGCode::circleFill(float x, float y, float size, float turnsDensity){
+	float angle_step =(TWO_PI/(float)circle_resolution);
+	begin_shape();
+	//(x)^2 + (y)^2 = r^2
+	// x = sqr(r^2 - y^2)
+	size_t n = size * turnsDensity;
+	for (size_t i=0; i < n; i++){
+		float pct = (i) / double(n - 1);
+		float yy = size * pct;
+		float xx = sqrtf( size * size - yy * yy);
+		float angle = angle_step  * i;
+		ofVec2f pnt;
+		pnt.x = x + xx;
+		pnt.y = y + yy;
+		vertex(pnt.x, pnt.y);
+		pnt.x = x - xx;
+		vertex(pnt.x, pnt.y);
+	}
+	end_shape(false);
 }
 
 //Emulating the begin/end shape functionality
@@ -592,7 +629,7 @@ void ofxGCode::sort(){
             }
         }
         
-        GCodeLineGroup group = line_groups[close_id];
+        GCodeLineGroup & group = line_groups[close_id];
         
         if (need_to_flip){
             for (int i=group.lines.size()-1; i>=0; i--){

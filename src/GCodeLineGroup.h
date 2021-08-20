@@ -25,7 +25,7 @@ public:
         do_not_reverse = false;
     }
     
-    void add_to_front(GLine line){
+    void add_to_front(GLine & line){
         lines.insert( lines.begin(), line);
         start_pos = line.a;
         if (lines.size() == 1)  end_pos = line.b;
@@ -33,7 +33,7 @@ public:
         if (line.do_not_reverse)    do_not_reverse = true;
     }
     
-    void add_to_back(GLine line){
+    void add_to_back(GLine & line){
         lines.push_back(line);
         end_pos = line.b;
         if (lines.size() == 1)  start_pos = line.a;
