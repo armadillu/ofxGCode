@@ -155,13 +155,13 @@ void ofxGCode::save(string name){
         if ( dist > 0.01){ //next line is not a continuous one, lift pen, move to the next line
 
 			//pen UP in the last pos we moved to
-			commands.push_back("G0 X" + ofToString(last_pos.x,2) + " Y"  + ofToString(last_pos.y,2) + " Z" + ofToString(pen_down_value + liftPenMm) + extraSpeedCommand);
+			commands.push_back("G0 X" + ofToString(last_pos.x,2) + " Y"  + ofToString(last_pos.y,2) + " Z" + ofToString(pen_down_value + liftPenMm) + " F2000");
 
 			//move to the new pos
-            commands.push_back("G0 X"+ofToString(pos_a.x,2) + " Y" + ofToString(pos_a.y,2) + " Z" + ofToString(pen_down_value + liftPenMm) + extraSpeedCommand);
+            commands.push_back("G0 X"+ofToString(pos_a.x,2) + " Y" + ofToString(pos_a.y,2) + " Z" + ofToString(pen_down_value + liftPenMm) + " F2000"); //move pen (while up) at top speed
 
 			//pen DOWN
-			commands.push_back("G0 X"+ofToString(pos_a.x,2) + " Y" + ofToString(pos_a.y,2) + " Z" + ofToString(pen_down_value) + extraSpeedCommand);
+			commands.push_back("G0 X"+ofToString(pos_a.x,2) + " Y" + ofToString(pos_a.y,2) + " Z" + ofToString(pen_down_value) + " F2000");
 
         }else{
             //cout<<"do not life pen at "<<line.a<<endl;
