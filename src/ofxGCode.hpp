@@ -45,6 +45,7 @@ public:
     
     Clipping clip;              //clipping mask to make sure we don't have lines out of bounds
 	ofRectangle usableCanvas;
+	ofRectangle usedCanvas = ofRectangle(0,0,0,0);
     
     //showing info
     bool show_transit_lines;        //if true, the movement of the plotter head while the pen is up will be drawn
@@ -126,11 +127,11 @@ public:
     //--- Polygons
     
     ///analogous to ofBeginShape()
-    void begin_shape();
+	void begin_shape( bool updateOfMatrix = false);
     ///analogous to ofVertex()
-    void vertex(ofVec2f p);
+	void vertex(const ofVec2f & p);
     ///analogous to ofVertex()
-    void vertex(float x, float y);
+	void vertex(const float & x, const float & y);
     ///analogous to ofEndShape()
     void end_shape(bool close);
     
@@ -140,14 +141,14 @@ public:
     
     //--- Lines
     ///draws a line that matches the GLine being passed in. (only the position will be used. Flag values will not be copied over)
-    void line(GLine _line);
+    void line(GLine & _line);
     ///draws a line between the given points
-    void line(ofVec2f a, ofVec2f b);
+    void line(ofVec2f & a, ofVec2f &  b);
     ///draws a line between the given points
     void line(float x1, float y1, float x2, float y2);
     
     ///adds multiple lines to the drawing
-    void add_lines(vector<GLine> new_lines);
+    void add_lines(vector<GLine> & new_lines);
     
     ///creates a thick line by adding multiple close lines next to the defined line. spacing determines how far apart the extra lines will be and layers determines how many lines will be added
     void thick_line(float x1, float y1, float x2, float y2, float spacing, int layers);
@@ -187,7 +188,7 @@ public:
     //there is probably a much better way to do this
     
     ///gets the position on the screen of a point, accounting for any 2D matrix transformations
-    ofVec2f getModelPoint(ofVec3f pnt);
+    ofVec2f getModelPoint(const ofVec3f & pnt);
     ///gets the position on the screen of a point, accounting for any 2D matrix transformations
     ofVec2f getModelPoint(float x, float y);
     
@@ -199,7 +200,9 @@ public:
     ///Takes all of the unlocked lines in the drawing and reorders them to try and produce the shortest possible travel distance
     ///This often involves flipping a line so it is drawn from B to A
     void sort();
-    
+
+	ofRectangle calculateCanvasSize();
+
     ///unlocks all current lines in the drawing, allowing them to be trimmed or moved
     void unlock_lines();
     ///locks all current lines in the drawing, preventing them from being trimmed or moved
@@ -277,15 +280,20 @@ public:
     //from http://paulbourke.net/geometry/insidepoly/
     ///returns true if the point described by x & y is inside the polygon defined by p
     static bool checkInPolygon(vector<ofVec2f> p, float x, float y);
-    
+
+
+	//call manually before every shape operation! TODO perf!
+	void udpateOfMatrix();
     
 
 protected:
 
 	float flipX(float &p) const;
 	float flipY(float &p) const;
-    
-    
+
+
+
+	ofMatrix4x4 ofMatrix; //current OF matrix whilst rendering
     
 };
 

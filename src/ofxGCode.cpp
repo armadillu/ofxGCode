@@ -33,20 +33,21 @@ void ofxGCode::setup(ofRectangle usableCanvas){
 
 void ofxGCode::clear(){
     lines.clear();
+	usedCanvas = ofRectangle();
 }
 
 void ofxGCode::draw(int max_lines_to_show){
 
 	float sx = ofGetWidth() / usableCanvas.getRight();
 	float sy = ofGetHeight() / usableCanvas.getBottom();
-	float scale = std::min(sx, sy) - 0.05;
+	float scale = std::min(sx, sy);
+
 	ofPushMatrix();
 	ofScale(scale, scale);
+	ofTranslate(-usableCanvas.getLeft()/2, -usableCanvas.getTop()/2);
 
 	//draw canvas
-	ofSetColor(255,255,0, 5);
-	ofNoFill();
-	ofFill();
+	ofSetColor(0, 10);
 	ofDrawRectangle(usableCanvas);
 	ofSetColor(255);
 
@@ -107,10 +108,20 @@ void ofxGCode::draw(int max_lines_to_show){
 	ofSetColor(0,0,0,255);
 	linesMesh.draw();
 
-	ofSetColor(255,0,0,40);
-	movesMesh.draw();
-	ofSetColor(255);
+	if(show_transit_lines){
+		ofSetColor(255,0,0,40);
+		movesMesh.draw();
+		ofSetColor(255);
+	}
 
+	ofNoFill();
+		ofSetColor(255,128,0);
+		ofDrawRectangle(usedCanvas);
+		ofSetColor(0,255,255);
+		ofDrawRectangle(usableCanvas);
+	ofFill();
+
+	ofSetColor(255);
 	ofPopMatrix();
 }
 
@@ -134,9 +145,10 @@ void ofxGCode::save(string name){
     //commands.push_back("G0 X0 Y0");
 
 	commands.push_back("G28"); //autohome
-	commands.push_back("G0 X0 Y0 Z" + ofToString(pen_down_value + liftPenMm) ); //lift pen
+	commands.push_back("G0 X0 Y0 Z" + ofToString(pen_down_value + liftPenMm) + " F2000"); //lift pen
+	commands.push_back("G0 X0 Y35 Z" + ofToString(pen_down_value + liftPenMm) + " F2000"); //avoid clip
 	//move to our "origin" (clip box)
-	commands.push_back("G0 X" + ofToString(clip.min.x,2) + " Y"  + ofToString(clip.min.y,2) + " Z" + ofToString(pen_down_value + liftPenMm) );
+	//commands.push_back("G0 X" + ofToString(clip.min.x,2) + " Y"  + ofToString(clip.min.y,2) + " Z" + ofToString(pen_down_value + liftPenMm) );
     
     ofVec2f last_pos = clip.min;
 
@@ -144,6 +156,9 @@ void ofxGCode::save(string name){
 	if(moveSpeed > 0){
 		extraSpeedCommand = " F" + ofToString(moveSpeed);
 	}
+
+	string penUp = " Z" + ofToString(pen_down_value + liftPenMm);
+	string penDown = " Z" + ofToString(pen_down_value);
 
     for(int i=0; i<lines.size(); i++){
         GLine & line = lines[i];
@@ -155,28 +170,28 @@ void ofxGCode::save(string name){
         if ( dist > 0.01){ //next line is not a continuous one, lift pen, move to the next line
 
 			//pen UP in the last pos we moved to
-			commands.push_back("G0 X" + ofToString(last_pos.x,2) + " Y"  + ofToString(last_pos.y,2) + " Z" + ofToString(pen_down_value + liftPenMm) + " F2000");
+			commands.push_back("G0 X" + ofToString(last_pos.x,2) + " Y"  + ofToString(last_pos.y,2) + penUp + " F2000");
 
 			//move to the new pos
-            commands.push_back("G0 X"+ofToString(pos_a.x,2) + " Y" + ofToString(pos_a.y,2) + " Z" + ofToString(pen_down_value + liftPenMm) + " F2000"); //move pen (while up) at top speed
+            commands.push_back("G0 X"+ofToString(pos_a.x,2) + " Y" + ofToString(pos_a.y,2) + penUp + " F2000"); //move pen (while up) at top speed
 
 			//pen DOWN
-			commands.push_back("G0 X"+ofToString(pos_a.x,2) + " Y" + ofToString(pos_a.y,2) + " Z" + ofToString(pen_down_value) + " F2000");
+			commands.push_back("G0 X"+ofToString(pos_a.x,2) + " Y" + ofToString(pos_a.y,2) + penDown + " F2000");
 
         }else{
             //cout<<"do not life pen at "<<line.a<<endl;
         }
         
         //move to the end point
-        commands.push_back("G1 X" + ofToString(pos_b.x) + " Y" + ofToString(pos_b.y)  + " Z" + ofToString(pen_down_value) + extraSpeedCommand);
+        commands.push_back("G1 X" + ofToString(pos_b.x) + " Y" + ofToString(pos_b.y) + penDown + extraSpeedCommand);
         
         //store it
         last_pos = pos_b;
     }
     
     //add some closing steps
-	commands.push_back("G0 X" + ofToString(last_pos.x,2) + " Y"  + ofToString(last_pos.y,2) + " Z" + ofToString(pen_down_value + liftPenMm) + extraSpeedCommand );
-	commands.push_back("G0 X0 Y225 Z" + ofToString(pen_down_value + liftPenMm) + extraSpeedCommand);
+	commands.push_back("G0 X" + ofToString(last_pos.x,2) + " Y"  + ofToString(last_pos.y,2) + penUp + extraSpeedCommand );
+	commands.push_back("G0 X0 Y225 " + penUp + extraSpeedCommand);
     
 	ofLogNotice() << "transit distance: " << measureTransitDistance();
     
@@ -326,9 +341,9 @@ void ofxGCode::spiral(float x, float y, float size, float turnsDensity){
 	for (size_t i=0; i < n; i++){
 		ofVec2f pnt;
 		float angle = angle_step  * i;
-		float pct = (i) / double(n - 1);
-		pnt.x = x + sin(angle) * size * pct;
-		pnt.y = y + cos(angle) * size * pct;
+		float pctAndSize = size * (i) / double(n - 1);
+		pnt.x = x + sinf(angle) * pctAndSize;
+		pnt.y = y + cosf(angle) * pctAndSize;
 		vertex(pnt.x, pnt.y);
 	}
 	end_shape(false);
@@ -355,14 +370,23 @@ void ofxGCode::circleFill(float x, float y, float size, float turnsDensity){
 	end_shape(false);
 }
 
+void ofxGCode::udpateOfMatrix(){
+	//update the OF matrix
+	ofMatrix4x4 mat = ofGetCurrentMatrix(OF_MATRIX_MODELVIEW);
+	ofMatrix = mat.getTransposedOf(mat);
+}
+
 //Emulating the begin/end shape functionality
-void ofxGCode::begin_shape(){
+void ofxGCode::begin_shape(bool updateOfMatrix){
+	if(updateOfMatrix){
+		udpateOfMatrix();
+	}
     shape_pnts.clear();
 }
-void ofxGCode::vertex(ofVec2f p){
+void ofxGCode::vertex(const ofVec2f & p){
     shape_pnts.push_back(p);
 }
-void ofxGCode::vertex(float x, float y){
+void ofxGCode::vertex(const float & x, const float & y){
     shape_pnts.push_back(ofVec2f(x,y));
 }
 void ofxGCode::end_shape(bool close){
@@ -388,11 +412,11 @@ void ofxGCode::polygon(vector<ofVec2f> pnts, bool close_shape){
 }
 
 //Lines
-void ofxGCode::line(GLine _line){
+void ofxGCode::line(GLine & _line){
     if (_line.skip_me)  return;
     line(_line.a.x,_line.a.y, _line.b.x,_line.b.y);
 }
-void ofxGCode::line(ofVec2f a, ofVec2f b){
+void ofxGCode::line(ofVec2f & a, ofVec2f & b){
     line(a.x, a.y, b.x, b.y);
 }
 
@@ -412,7 +436,7 @@ void ofxGCode::line(float x1, float y1, float x2, float y2){
 }
 
 //adds a vector of GLines
-void ofxGCode::add_lines(vector<GLine> new_lines){
+void ofxGCode::add_lines(vector<GLine> & new_lines){
     for (int i=0; i<new_lines.size(); i++){
         line(new_lines[i]);
     }
@@ -541,22 +565,37 @@ void ofxGCode::text(string text, ofTrueTypeFont * font, float x, float y){
 //Currently it only works in 2D. 3D transformations will break it.
 //it sometimes gets locked at 90 degree angles when the actual angle is 89 or 91. Not sure why
 //it could definitely be more efficient by using quaternions properly
-ofVec2f ofxGCode::getModelPoint(ofVec3f pnt){
+ofVec2f ofxGCode::getModelPoint(const ofVec3f & pnt){
     return getModelPoint(pnt.x, pnt.y);
 }
 
 
 ofVec2f ofxGCode::getModelPoint(float x, float y){
-
-	ofMatrix4x4 ofMatrix = ofGetCurrentMatrix(OF_MATRIX_MODELVIEW);
-	ofMatrix = ofMatrix.getTransposedOf(ofMatrix);
-
 	ofVec4f pt = ofVec4f(x,y,0,1);
 	ofVec4f pt2 = ofMatrix * pt + ofVec4f(ofGetViewportWidth()/2, ofGetViewportHeight()/2, 0, 0);
-
 	return ofVec2f(pt2.x, pt2.y);
 }
 
+
+ofRectangle ofxGCode::calculateCanvasSize(){
+
+	ofRectangle totalArea;
+	bool firstLine = true;
+	for (auto & l : lines){
+		if(!l.skip_me){
+			ofRectangle lineArea = ofRectangle(l.a.x, l.a.y, l.b.x - l.a.x, l.b.y - l.a.y);
+			if(firstLine){
+				firstLine = false;
+				totalArea = lineArea;
+			}else{
+				totalArea = totalArea.getUnion(lineArea);
+			}
+		}
+	}
+
+	usedCanvas = totalArea;
+	return totalArea;
+}
 
 //this is not perfect yet. Some of the resulting order is definitely not as efficient as it could be
 void ofxGCode::sort(){
@@ -607,13 +646,14 @@ void ofxGCode::sort(){
         
         //check each unsorted line group
         for (int i=0; i<line_groups.size(); i++){
-            float dist_sq_a = ofDistSquared(line_groups[i].start_pos.x, line_groups[i].start_pos.y, cur_pnt.x, cur_pnt.y);
+			const auto & thisGroup = line_groups[i];
+            float dist_sq_a = ofDistSquared(thisGroup.start_pos.x, thisGroup.start_pos.y, cur_pnt.x, cur_pnt.y);
             
             //only get distance to B if it is OK to flip this line
             float dist_sq_b = 99999999;
-            bool can_reverse = !line_groups[i].do_not_reverse;
+            bool can_reverse = !thisGroup.do_not_reverse;
             if (can_reverse){
-                dist_sq_b = ofDistSquared(line_groups[i].end_pos.x, line_groups[i].end_pos.y, cur_pnt.x, cur_pnt.y);
+                dist_sq_b = ofDistSquared(thisGroup.end_pos.x, thisGroup.end_pos.y, cur_pnt.x, cur_pnt.y);
             }
             
             //are either of these poitns the closest so far?

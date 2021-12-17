@@ -150,7 +150,7 @@ void ofxHersheyFont::draw(string stringValue, float xPos, float yPos, float scal
 
 //--------------------------------------------------------------
 void ofxHersheyFont::drawChar(int asciiValue, ofxGCode * gcode) {
-	gcode->begin_shape();
+	gcode->begin_shape(true);
 
 	//iterate through points of the character
    
@@ -169,7 +169,7 @@ void ofxHersheyFont::drawChar(int asciiValue, ofxGCode * gcode) {
 		if (x == -1) {
             gcode->end_shape(false);
 
-            gcode->begin_shape();
+            gcode->begin_shape(true);
 		}
 	}
     gcode->end_shape(false);
