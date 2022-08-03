@@ -145,8 +145,8 @@ void ofxGCode::save(string name){
     //commands.push_back("G0 X0 Y0");
 
 	commands.push_back("G28"); //autohome
-	commands.push_back("G0 X0 Y0 Z" + ofToString(pen_down_value + liftPenMm) + " F2000"); //lift pen
-	commands.push_back("G0 X0 Y35 Z" + ofToString(pen_down_value + liftPenMm) + " F2000"); //avoid clip
+	commands.push_back("G0 X0 Y0 Z" + ofToString(pen_down_value + liftPenMm * 3) + " F2000"); //lift pen
+	commands.push_back("G0 X0 Y35 Z" + ofToString(pen_down_value + liftPenMm * 3) + " F2000"); //avoid clip
 	//move to our "origin" (clip box)
 	//commands.push_back("G0 X" + ofToString(clip.min.x,2) + " Y"  + ofToString(clip.min.y,2) + " Z" + ofToString(pen_down_value + liftPenMm) );
     
